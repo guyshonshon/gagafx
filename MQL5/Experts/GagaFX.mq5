@@ -1029,10 +1029,28 @@ void LogPredictionUpdate(double p1, double p2, double p3, double atr)
 {
    if(g_LogPredictions)
    {
-      Print("Prediction Update - p1:", DoubleToString(p1, 3), " p2:", DoubleToString(p2, 3), " p3:", DoubleToString(p3, 3), " ATR:", DoubleToString(atr, SymDigits));
-      Print("Bar Count:", barCount, " Threshold:", DoubleToString(g_PredictThreshold, 3));
-      Print("Pred Long:", (p1>=g_PredictThreshold || p2>=g_PredictThreshold || p3>=g_PredictThreshold));
-      Print("Pred Short:", (p1<=1.0-g_PredictThreshold || p2<=1.0-g_PredictThreshold || p3<=1.0-g_PredictThreshold));
+      double currentPrice = (SymbolInfoDouble(sym,SYMBOL_ASK) + SymbolInfoDouble(sym,SYMBOL_BID)) / 2.0;
+      
+      // Calculate expected price movements
+      double exp1 = (p1>=0.5 ? +0.20*atr/_pt : -0.20*atr/_pt);
+      double exp2 = (p2>=0.5 ? +0.35*atr/_pt : -0.35*atr/_pt);
+      double exp3 = (p3>=0.5 ? +0.55*atr/_pt : -0.55*atr/_pt);
+      
+      double expectedPrice1 = currentPrice + exp1*_pt;
+      double expectedPrice2 = currentPrice + exp2*_pt;
+      double expectedPrice3 = currentPrice + exp3*_pt;
+      
+      Print("📊 PREDICTION UPDATE:");
+      Print("   Current Price: ", DoubleToString(currentPrice, SymDigits));
+      Print("   p1: ", DoubleToString(p1, 3), " → Expected +1: ", DoubleToString(expectedPrice1, SymDigits), " (", DoubleToString(exp1, 1), " pts)");
+      Print("   p2: ", DoubleToString(p2, 3), " → Expected +2: ", DoubleToString(expectedPrice2, SymDigits), " (", DoubleToString(exp2, 1), " pts)");
+      Print("   p3: ", DoubleToString(p3, 3), " → Expected +3: ", DoubleToString(expectedPrice3, SymDigits), " (", DoubleToString(exp3, 1), " pts)");
+      Print("   ATR: ", DoubleToString(atr, 2), " | Bar Count: ", barCount);
+      
+      double effectiveThreshold = g_TestingMode ? g_TestingThreshold : g_PredictThreshold;
+      bool predLong = (p1>=effectiveThreshold || p2>=effectiveThreshold || p3>=effectiveThreshold);
+      bool predShort = (p1<=1.0-effectiveThreshold || p2<=1.0-effectiveThreshold || p3<=1.0-effectiveThreshold);
+      Print("   Threshold: ", DoubleToString(effectiveThreshold, 3), " | Pred Long: ", (predLong?"✓":"✗"), " Pred Short: ", (predShort?"✓":"✗"));
    }
 }
 
@@ -1061,12 +1079,20 @@ void LogBotPulse(double p1, double p2, double p3, double atr, double currentPric
    Print("│   RSI: ", DoubleToString(rsi, 2), " ATR: ", DoubleToString(atr, SymDigits));
    Print("│   Spread: ", SpreadPoints(), " pts");
    
-   // Predictions
+   // Predictions with expected prices
    Print("│ PREDICTIONS:");
    Print("│   p1: ", DoubleToString(p1, 3), " p2: ", DoubleToString(p2, 3), " p3: ", DoubleToString(p3, 3));
    double effectiveThreshold = g_TestingMode ? g_TestingThreshold : g_PredictThreshold;
    Print("│   Threshold: ", DoubleToString(effectiveThreshold, 3), (g_TestingMode?" (TESTING)":""));
    Print("│   Pred Long: ", (predLong?"✓":"✗"), " Pred Short: ", (predShort?"✓":"✗"));
+   
+   // Expected price movements
+   double exp1 = (p1>=0.5 ? +0.20*atr/_pt : -0.20*atr/_pt);
+   double exp2 = (p2>=0.5 ? +0.35*atr/_pt : -0.35*atr/_pt);
+   double exp3 = (p3>=0.5 ? +0.55*atr/_pt : -0.55*atr/_pt);
+   Print("│   Expected +1: ", DoubleToString(currentPrice + exp1*_pt, SymDigits), " (", DoubleToString(exp1, 1), " pts)");
+   Print("│   Expected +2: ", DoubleToString(currentPrice + exp2*_pt, SymDigits), " (", DoubleToString(exp2, 1), " pts)");
+   Print("│   Expected +3: ", DoubleToString(currentPrice + exp3*_pt, SymDigits), " (", DoubleToString(exp3, 1), " pts)");
    
    // Analysis
    Print("│ ANALYSIS:");
@@ -1094,10 +1120,18 @@ void LogBotPulse(double p1, double p2, double p3, double atr, double currentPric
       if(!g_Enabled) Print("│   ✗ Trading disabled");
       if(SpreadPoints() > g_MaxSpreadPoints_Runtime) Print("│   ✗ Spread too high: ", SpreadPoints(), " > ", g_MaxSpreadPoints_Runtime);
       if(!longBias && !shortBias) Print("│   ✗ No trend bias");
-      if(!pattLong && !pattShort) Print("│   ✗ No pattern signal");
-      if(!oscLong && !oscShort) Print("│   ✗ No oscillator signal");
+      if(!g_IgnorePattern && !pattLong && !pattShort) Print("│   ✗ No pattern signal");
+      if(!g_IgnoreOscillator && !oscLong && !oscShort) Print("│   ✗ No oscillator signal");
       if(g_UsePredictionsForEntries && !predLong && !predShort) Print("│   ✗ Prediction gate blocked");
       if(CountOpenByMagic(0) >= MaxOpenPositions) Print("│   ✗ Max positions reached: ", CountOpenByMagic(0), "/", MaxOpenPositions);
+      
+      // Additional debugging
+      Print("│ DEBUG - Individual checks:");
+      Print("│   longBias:", longBias, " shortBias:", shortBias);
+      Print("│   pattLong:", pattLong, " pattShort:", pattShort, " (ignore:", g_IgnorePattern, ")");
+      Print("│   oscLong:", oscLong, " oscShort:", oscShort, " (ignore:", g_IgnoreOscillator, ")");
+      Print("│   predLong:", predLong, " predShort:", predShort, " (usePred:", g_UsePredictionsForEntries, ")");
+      Print("│   positions:", CountOpenByMagic(0), "/", MaxOpenPositions);
    }
    
    Print("└─────────────────────────────────────────────────────────────┘");
