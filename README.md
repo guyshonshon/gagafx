@@ -1,44 +1,87 @@
-# GagaFX MQL5 Scripts Package
+# GagaFX - Professional MetaTrader 5 Expert Advisor
 
-This repo is a clean, minimal package structure to organize your MetaTrader 5 scripts. Drop your `.mq5` files under `MQL5/Scripts/` and use the deploy helper to copy/symlink them into your MetaTrader 5 Data Folder.
+A sophisticated MetaTrader 5 Expert Advisor featuring AI-powered predictions, Break of Structure (BOS) analysis, and a modern HUD interface. Built with professional-grade risk management and multi-timeframe analysis.
 
-## Layout
+## 🚀 Features
 
-- `MQL5/Experts/` — Expert Advisors (`.mq5` with OnTick/OnInit)
-- `MQL5/Scripts/` — one‑off scripts (no OnTick)
-- `MQL5/Include/` — shared headers (`.mqh`) for reuse across scripts
-- `MQL5/Libraries/` — compiled libs and third-party code (optional)
-- `MQL5/Files/` — runtime files output/input used by scripts
-- `tools/` — helper scripts for deployment
+- **AI Predictions**: Machine learning-based price movement predictions (+1, +2, +3 bars)
+- **Break of Structure (BOS)**: Advanced market structure analysis
+- **Multi-Timeframe Context**: HTF bias analysis across M5, M15, M30, H1
+- **Professional HUD**: Clean, responsive interface with proper positioning
+- **Risk Management**: Dynamic position sizing, trailing stops, partial closes
+- **Session & News Filters**: Smart trading time and news event filtering
+- **Real-time Monitoring**: Live prediction updates and trade tracking
 
-## .editorconfig
+## 📊 Technical Indicators
 
-Basic formatting defaults are provided (`4` spaces, LF endings). Adjust as needed for your editor and style.
+- **Trend**: EMA (50/200), SMA (20/100)
+- **Momentum**: RSI (14), TSI (25/13/7)
+- **Volatility**: ATR (14) for stops and position sizing
+- **Structure**: Pivot-based swing analysis with BOS detection
 
-## Adding your script
+## 🎯 HUD Interface
 
-1. Place EAs in `MQL5/Experts/YourEA.mq5` (like `Experts/GagaFX.mq5`). Place single‑run scripts in `MQL5/Scripts/`.
-2. Optionally add shared headers in `MQL5/Include/*.mqh` and `#include <YourHeader.mqh>`.
+The EA features a professional HUD with:
+- **Top-right panel**: Trading controls, risk info, and status
+- **Bottom-right widget**: Real-time prediction probabilities
+- **Responsive design**: Adapts to different screen sizes and DPI settings
+- **Theme-aware**: Automatic dark/light mode detection
 
-## Deploying to MetaTrader 5
+## 📁 Project Structure
 
-The most reliable way to find your MT5 Data Folder is inside MetaTrader:
+- `MQL5/Experts/GagaFX.mq5` — Main Expert Advisor
+- `MQL5/Files/` — Runtime data files (CSV logs, JSON exports)
+- `MQL5/Include/` — Shared headers and utilities
+- `templates/` — MQL5 script templates
+- `tools/` — Deployment and utility scripts
 
-- In MetaTrader 5: File → Open Data Folder → this opens the root (contains `MQL5/`).
+## ⚙️ Installation & Setup
 
-Then you have two options:
+1. **Clone the repository**:
+   ```bash
+   git clone https://github.com/guyshonshon/gagafx.git
+   cd gagafx
+   ```
 
-- Copy: run `bash tools/deploy.sh --data-dir "/path/to/Data Folder"` to copy this repo's `MQL5` contents into the terminal's `MQL5` directory.
-- Symlink: see instructions in `tools/deploy.sh --help` to symlink `MQL5/Scripts` to your terminal's `MQL5/Scripts` so edits here appear instantly in MetaEditor.
+2. **Deploy to MetaTrader 5**:
+   - Open MetaTrader 5 → File → Open Data Folder
+   - Run: `bash tools/deploy.sh --data-dir "/path/to/Data Folder"`
+   - Or use symlinks for live development: `bash tools/deploy.sh --symlink`
 
-Notes:
-- Always keep file names stable to preserve compiled `.ex5` cache in MetaTrader.
-- If you use symlinks on Windows, run Git Bash or WSL with admin rights when creating them.
+3. **Compile in MetaEditor**:
+   - Open MetaEditor from MetaTrader 5
+   - Open `MQL5/Experts/GagaFX.mq5`
+   - Compile (F7) and attach to chart
 
-## MetaEditor / Compilation
+## 🎛️ Configuration
 
-You don't need to compile here. Open MetaEditor (from MetaTrader) and compile your script there. This repo just tracks your source and structure.
+The EA features organized input parameters:
+- **Basic Parameters**: Symbol, timeframe, magic number
+- **Risk & Execution**: Position sizing, spread limits, slippage
+- **Filters**: Session times, news blocking
+- **Indicators**: EMA, RSI, ATR periods and thresholds
+- **Stops/Targets**: ATR multipliers, partial closes, trailing stops
+- **Prediction Gate**: AI threshold, calibration settings
 
-## License
+## 📈 Usage
 
-No license set. Add one if you plan to share publicly.
+1. **Attach to Chart**: Drag GagaFX.mq5 to your desired chart
+2. **Configure Parameters**: Press F7 to open Properties dialog
+3. **Monitor HUD**: Watch the top-right panel for status and controls
+4. **View Predictions**: Check bottom-right widget for AI predictions
+5. **Control Trading**: Use START/STOP and Gate buttons on HUD
+
+## 🔧 Development
+
+- **Code Style**: 4 spaces, LF endings (see `.editorconfig`)
+- **File Structure**: Organized MQL5 standard layout
+- **Version Control**: Git with proper `.gitignore` for MQL5
+- **Deployment**: Automated scripts for easy MT5 integration
+
+## 📝 License
+
+This project is open source. Please check the license file for details.
+
+## 🤝 Contributing
+
+Contributions are welcome! Please feel free to submit pull requests or open issues for bugs and feature requests.
