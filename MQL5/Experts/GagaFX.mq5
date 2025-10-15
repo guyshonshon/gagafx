@@ -1030,6 +1030,61 @@ void LogEntryConditions(bool longBias, bool shortBias, bool pattLong, bool pattS
    Print("========================");
 }
 
+// Comprehensive pulse update showing bot's thinking
+void LogBotPulse(double p1, double p2, double p3, double atr, double currentPrice, double emaF, double emaS, double rsi, bool longBias, bool shortBias, bool pattLong, bool pattShort, bool oscLong, bool oscShort, bool predLong, bool predShort, bool allowLong, bool allowShort, string nextPlanSide, double nextPlanLots, double nextPlanEntry, double nextPlanEstPx)
+{
+   Print("┌─────────────────────────────────────────────────────────────┐");
+   Print("│                    GAGAFX BOT PULSE                        │");
+   Print("├─────────────────────────────────────────────────────────────┤");
+   
+   // Current market state
+   Print("│ MARKET STATE:");
+   Print("│   Current Price: ", DoubleToString(currentPrice, SymDigits));
+   Print("│   EMA Fast: ", DoubleToString(emaF, SymDigits), " EMA Slow: ", DoubleToString(emaS, SymDigits));
+   Print("│   RSI: ", DoubleToString(rsi, 2), " ATR: ", DoubleToString(atr, SymDigits));
+   Print("│   Spread: ", SpreadPoints(), " pts");
+   
+   // Predictions
+   Print("│ PREDICTIONS:");
+   Print("│   p1: ", DoubleToString(p1, 3), " p2: ", DoubleToString(p2, 3), " p3: ", DoubleToString(p3, 3));
+   Print("│   Threshold: ", DoubleToString(g_PredictThreshold, 3));
+   Print("│   Pred Long: ", (predLong?"✓":"✗"), " Pred Short: ", (predShort?"✓":"✗"));
+   
+   // Analysis
+   Print("│ ANALYSIS:");
+   Print("│   Trend Bias: ", (longBias?"BULL":"BEAR"), " Pattern: ", (pattLong?"BULL":"BEAR"), " Osc: ", (oscLong?"BULL":"BEAR"));
+   Print("│   Long Signal: ", (allowLong?"✓ READY":"✗ BLOCKED"), " Short Signal: ", (allowShort?"✓ READY":"✗ BLOCKED"));
+   
+   // Next action plan
+   Print("│ NEXT ACTION:");
+   if(nextPlanSide != "FLAT")
+   {
+      Print("│   Direction: ", nextPlanSide, " Lots: ", DoubleToString(nextPlanLots, 2));
+      Print("│   Entry: ", DoubleToString(nextPlanEntry, SymDigits), " Expected: ", DoubleToString(nextPlanEstPx, SymDigits));
+      double leverage = nextPlanLots * SymbolInfoDouble(sym, SYMBOL_TRADE_CONTRACT_SIZE) * nextPlanEntry / AccountInfoDouble(ACCOUNT_EQUITY);
+      Print("│   Leverage: ", DoubleToString(leverage*100, 1), "%");
+   }
+   else
+   {
+      Print("│   Status: WAITING - No clear signal");
+   }
+   
+   // Why no action (if applicable)
+   if(!allowLong && !allowShort)
+   {
+      Print("│ BLOCKING CONDITIONS:");
+      if(!g_Enabled) Print("│   ✗ Trading disabled");
+      if(SpreadPoints() > g_MaxSpreadPoints_Runtime) Print("│   ✗ Spread too high: ", SpreadPoints(), " > ", g_MaxSpreadPoints_Runtime);
+      if(!longBias && !shortBias) Print("│   ✗ No trend bias");
+      if(!pattLong && !pattShort) Print("│   ✗ No pattern signal");
+      if(!oscLong && !oscShort) Print("│   ✗ No oscillator signal");
+      if(g_UsePredictionsForEntries && !predLong && !predShort) Print("│   ✗ Prediction gate blocked");
+      if(CountOpenByMagic(0) >= MaxOpenPositions) Print("│   ✗ Max positions reached: ", CountOpenByMagic(0), "/", MaxOpenPositions);
+   }
+   
+   Print("└─────────────────────────────────────────────────────────────┘");
+}
+
 void OnlineScoreAndLearn()
 {
    int idx = (writePos-1+BUF)%BUF;
@@ -1281,21 +1336,19 @@ void ManagePositions()
 //============================= Entries =================================//
 void TryEntries(double p1,double p2,double p3)
 {
-   Print("TryEntries called - g_Enabled:", g_Enabled, " p1:", DoubleToString(p1, 3), " p2:", DoubleToString(p2, 3), " p3:", DoubleToString(p3, 3));
-   
-   if(!g_Enabled) { Print("TryEntries: Trading disabled"); return; } // START/STOP master gate
+   if(!g_Enabled) return; // START/STOP master gate
    
    // Spread + microstructure + rollover
    int spread = SpreadPoints();
-   if(spread>g_MaxSpreadPoints_Runtime) { Print("TryEntries: Spread too high:", spread, " > ", g_MaxSpreadPoints_Runtime); return; }
+   if(spread>g_MaxSpreadPoints_Runtime) return;
 
    MqlDateTime mt; TimeToStruct(TimeCurrent(), mt);
-   if(mt.min<5 || mt.min>=55) { Print("TryEntries: Microstructure filter - minute:", mt.min); return; } // first/last 5 minutes of hour
-   if((mt.hour==23 && mt.min>=45) || (mt.hour==0 && mt.min<=15)) { Print("TryEntries: Midnight rollover filter"); return; } // midnight roll
+   if(mt.min<5 || mt.min>=55) return; // first/last 5 minutes of hour
+   if((mt.hour==23 && mt.min>=45) || (mt.hour==0 && mt.min<=15)) return; // midnight roll
 
    // Session & news
-   if(UseSessionFilter && !(mt.hour>=SessionStartHour && mt.hour<SessionEndHour)) { Print("TryEntries: Session filter - hour:", mt.hour); return; }
-   if(BlockHighImpactNews && InNewsWindow(TimeCurrent())) { Print("TryEntries: News block active"); return; }
+   if(UseSessionFilter && !(mt.hour>=SessionStartHour && mt.hour<SessionEndHour)) return;
+   if(BlockHighImpactNews && InNewsWindow(TimeCurrent())) return;
    
    if(!EnsureRates(3)) return;
 
@@ -1321,8 +1374,7 @@ void TryEntries(double p1,double p2,double p3)
    bool allowLong  = longBias && pattLong  && oscLong  && bosOkLong  && (!g_UsePredictionsForEntries || predLong);
    bool allowShort = shortBias&& pattShort && oscShort && bosOkShort && (!g_UsePredictionsForEntries || predShort);
 
-   // Log entry conditions for debugging
-   LogEntryConditions(longBias, shortBias, pattLong, pattShort, oscLong, oscShort, predLong, predShort, allowLong, allowShort);
+   // Entry conditions are now logged in the comprehensive pulse above
 
    // HTF S/R proximity
    bool nearRes=false, nearSup=false;
@@ -1340,15 +1392,10 @@ void TryEntries(double p1,double p2,double p3)
       if(HasOppositePosition(+1)) allowLong=false;
       if(HasOppositePosition(-1)) allowShort=false;
    }
-   if(CountOpenByMagic(0)>=MaxOpenPositions) { 
-      Print("TryEntries: Max positions reached:", CountOpenByMagic(0), " >= ", MaxOpenPositions);
-      allowLong=false; allowShort=false; 
-   }
+   if(CountOpenByMagic(0)>=MaxOpenPositions) { allowLong=false; allowShort=false; }
 
-   if(nearRes && !bosUp)   { Print("TryEntries: Near resistance, no BOS up"); allowLong  = false; }
-   if(nearSup && !bosDown) { Print("TryEntries: Near support, no BOS down"); allowShort = false; }
-   
-   Print("TryEntries: Final allowLong:", allowLong, " allowShort:", allowShort);
+   if(nearRes && !bosUp)   allowLong  = false;
+   if(nearSup && !bosDown) allowShort = false;
 
    double ask=SymbolInfoDouble(sym,SYMBOL_ASK);
    double bid=SymbolInfoDouble(sym,SYMBOL_BID);
@@ -1918,6 +1965,13 @@ int OnInit()
    Print("GagaFX: Prediction threshold set to:", DoubleToString(g_PredictThreshold, 3));
    Print("GagaFX: Trading enabled:", g_Enabled, " UsePredictionsForEntries:", g_UsePredictionsForEntries);
    Print("GagaFX: Max spread:", g_MaxSpreadPoints_Runtime, " Risk %:", g_RiskPerTradePct_Runtime);
+   Print("==========================================");
+   Print("GagaFX: BOT STARTED - Monitoring ", sym, " on ", EnumToString(tf), " timeframe");
+   Print("GagaFX: Strategy Mode:", (g_StrategyMode==MODE_SCALP?"SCALP":"EXTENDED"));
+   Print("GagaFX: Session Filter:", (UseSessionFilter?"ON":"OFF"), " (", SessionStartHour, ":00-", SessionEndHour, ":00)");
+   Print("GagaFX: News Filter:", (BlockHighImpactNews?"ON":"OFF"));
+   Print("GagaFX: Max Positions:", MaxOpenPositions, " Hedge Allowed:", AllowHedge);
+   Print("==========================================");
 
    // daily baseline
    dayStartEquity=AccountInfoDouble(ACCOUNT_EQUITY);
@@ -1937,6 +1991,16 @@ int OnInit()
    // prime rates
    EnsureRates(3);
    lastBarTime = (gBars>=2 ? TimeAt(1) : 0);
+   
+   // Show initial pulse
+   Print("GagaFX: Showing initial market state...");
+   double emaF,emaS,smaF,smaS,rsi,atr;
+   if(GetBuffers(emaF,emaS,smaF,smaS,rsi,atr))
+   {
+      double p1=0.5, p2=0.5, p3=0.5; // Initial neutral predictions
+      double currentPrice = (SymbolInfoDouble(sym,SYMBOL_ASK) + SymbolInfoDouble(sym,SYMBOL_BID)) / 2.0;
+      LogBotPulse(p1, p2, p3, atr, currentPrice, emaF, emaS, rsi, false, false, false, false, false, false, false, false, false, false, "FLAT", 0.0, 0.0, 0.0);
+   }
 
    return(INIT_SUCCEEDED);
 }
@@ -2101,6 +2165,22 @@ void OnTick()
          
          // Log prediction updates
          LogPredictionUpdate(p1, p2, p3, atr);
+         
+         // Calculate analysis for pulse logging
+         bool longBias  = (emaF>emaS && trendBias!=BEAR);
+         bool shortBias = (emaF<emaS && trendBias!=BULL);
+         bool pattLong  = IsBullishReversal(1);
+         bool pattShort = IsBearishReversal(1);
+         bool oscLong   = (rsi>=RSI_LongMin && tsid>=TSI_MinDiff);
+         bool oscShort  = (rsi<=RSI_ShortMax && tsid<=-TSI_MinDiff);
+         bool predLong  = (p1>=g_PredictThreshold || p2>=g_PredictThreshold || p3>=g_PredictThreshold);
+         bool predShort = (p1<=1.0-g_PredictThreshold || p2<=1.0-g_PredictThreshold || p3<=1.0-g_PredictThreshold);
+         bool allowLong  = longBias && pattLong  && oscLong  && (!g_UsePredictionsForEntries || predLong);
+         bool allowShort = shortBias&& pattShort && oscShort && (!g_UsePredictionsForEntries || predShort);
+         
+         // Show bot pulse every bar
+         double currentPrice = (SymbolInfoDouble(sym,SYMBOL_ASK) + SymbolInfoDouble(sym,SYMBOL_BID)) / 2.0;
+         LogBotPulse(p1, p2, p3, atr, currentPrice, emaF, emaS, rsi, longBias, shortBias, pattLong, pattShort, oscLong, oscShort, predLong, predShort, allowLong, allowShort, g_NextPlanSide, g_NextPlanLots, g_NextPlanEntry, g_NextPlanEstPx);
       }
 
       DrawPredictionArrows(p1,p2,p3);
