@@ -284,65 +284,50 @@ int    g_MaxSpreadPoints_Runtime=0;
 
 void HUD_Build()
 {
-   bool dark; color pbg,pbrd,txt; GFX_GetTheme(pbg,pbrd,txt,dark);
-   double s=GFX_Scale();
-
-   // HUD dimensions and positioning
-   int panelW = (int)MathRound(180*s);
-   int panelH = (int)MathRound(80*s);
-   int margin = (int)MathRound(10*s);
-   int padding = (int)MathRound(8*s);
+   // Simple, reliable HUD using CORNER_LEFT_UPPER for easier positioning
+   color bg = (color)ChartGetInteger(0,CHART_COLOR_BACKGROUND,0);
+   bool dark = (bg==0 || bg==clrBlack);
+   color panelBg = dark ? C'40,40,40' : C'240,240,240';
+   color textColor = dark ? C'255,255,255' : C'0,0,0';
+   color buttonOn = C'0,150,0';
+   color buttonOff = C'150,0,0';
    
-   // For CORNER_RIGHT_UPPER: x=0 means right edge, y=0 means top edge
-   // So we position from the right edge inward
-   int panelX = margin;  // distance from right edge
-   int panelY = margin;  // distance from top edge
-
-   // Create main panel background
+   // Main panel background
    if(ObjectFind(0,HUD_BG)<0) ObjectCreate(0,HUD_BG,OBJ_RECTANGLE_LABEL,0,0,0);
-   ObjectSetInteger(0,HUD_BG,OBJPROP_CORNER,CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0,HUD_BG,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);
-   ObjectSetInteger(0,HUD_BG,OBJPROP_XDISTANCE,panelX);
-   ObjectSetInteger(0,HUD_BG,OBJPROP_YDISTANCE,panelY);
-   ObjectSetInteger(0,HUD_BG,OBJPROP_XSIZE,panelW);
-   ObjectSetInteger(0,HUD_BG,OBJPROP_YSIZE,panelH);
-   ObjectSetInteger(0,HUD_BG,OBJPROP_BGCOLOR,pbg);
-   ObjectSetInteger(0,HUD_BG,OBJPROP_COLOR,pbrd);
+   ObjectSetInteger(0,HUD_BG,OBJPROP_CORNER,CORNER_LEFT_UPPER);
+   ObjectSetInteger(0,HUD_BG,OBJPROP_XDISTANCE,10);
+   ObjectSetInteger(0,HUD_BG,OBJPROP_YDISTANCE,10);
+   ObjectSetInteger(0,HUD_BG,OBJPROP_XSIZE,200);
+   ObjectSetInteger(0,HUD_BG,OBJPROP_YSIZE,100);
+   ObjectSetInteger(0,HUD_BG,OBJPROP_BGCOLOR,panelBg);
+   ObjectSetInteger(0,HUD_BG,OBJPROP_COLOR,C'100,100,100');
    ObjectSetInteger(0,HUD_BG,OBJPROP_BACK,true);
    ObjectSetInteger(0,HUD_BG,OBJPROP_SELECTABLE,false);
    ObjectSetInteger(0,HUD_BG,OBJPROP_ZORDER,0);
 
-   // Title label
+   // Title
    if(ObjectFind(0,HUD_T)<0) ObjectCreate(0,HUD_T,OBJ_LABEL,0,0,0);
-   ObjectSetInteger(0,HUD_T,OBJPROP_CORNER,CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0,HUD_T,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);
-   ObjectSetInteger(0,HUD_T,OBJPROP_XDISTANCE,panelX + panelW - padding);
-   ObjectSetInteger(0,HUD_T,OBJPROP_YDISTANCE,panelY + padding);
-   ObjectSetInteger(0,HUD_T,OBJPROP_FONTSIZE,(int)MathRound(12*s));
-   ObjectSetInteger(0,HUD_T,OBJPROP_COLOR,txt);
+   ObjectSetInteger(0,HUD_T,OBJPROP_CORNER,CORNER_LEFT_UPPER);
+   ObjectSetInteger(0,HUD_T,OBJPROP_XDISTANCE,20);
+   ObjectSetInteger(0,HUD_T,OBJPROP_YDISTANCE,20);
+   ObjectSetInteger(0,HUD_T,OBJPROP_FONTSIZE,12);
+   ObjectSetInteger(0,HUD_T,OBJPROP_COLOR,textColor);
    ObjectSetString(0,HUD_T,OBJPROP_FONT,"Arial Bold");
    ObjectSetString(0,HUD_T,OBJPROP_TEXT,"GagaFX");
    ObjectSetInteger(0,HUD_T,OBJPROP_BACK,false);
    ObjectSetInteger(0,HUD_T,OBJPROP_SELECTABLE,false);
    ObjectSetInteger(0,HUD_T,OBJPROP_ZORDER,1);
 
-   // Buttons
-   int btnW = (int)MathRound(70*s);
-   int btnH = (int)MathRound(20*s);
-   int btnGap = (int)MathRound(5*s);
-   int btnY = panelY + padding + (int)MathRound(20*s);
-   
    // START/STOP button
    if(ObjectFind(0,HUD_START)<0) ObjectCreate(0,HUD_START,OBJ_BUTTON,0,0,0);
-   ObjectSetInteger(0,HUD_START,OBJPROP_CORNER,CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0,HUD_START,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);
-   ObjectSetInteger(0,HUD_START,OBJPROP_XDISTANCE,panelX + panelW - padding - btnW);
-   ObjectSetInteger(0,HUD_START,OBJPROP_YDISTANCE,btnY);
-   ObjectSetInteger(0,HUD_START,OBJPROP_XSIZE,btnW);
-   ObjectSetInteger(0,HUD_START,OBJPROP_YSIZE,btnH);
-   ObjectSetInteger(0,HUD_START,OBJPROP_BGCOLOR,(g_Enabled?GFX_TOGGLE_OFF_BG:GFX_TOGGLE_ON_BG));
-   ObjectSetInteger(0,HUD_START,OBJPROP_COLOR,GFX_WHITE);
-   ObjectSetInteger(0,HUD_START,OBJPROP_FONTSIZE,(int)MathRound(9*s));
+   ObjectSetInteger(0,HUD_START,OBJPROP_CORNER,CORNER_LEFT_UPPER);
+   ObjectSetInteger(0,HUD_START,OBJPROP_XDISTANCE,20);
+   ObjectSetInteger(0,HUD_START,OBJPROP_YDISTANCE,45);
+   ObjectSetInteger(0,HUD_START,OBJPROP_XSIZE,60);
+   ObjectSetInteger(0,HUD_START,OBJPROP_YSIZE,25);
+   ObjectSetInteger(0,HUD_START,OBJPROP_BGCOLOR,(g_Enabled?buttonOff:buttonOn));
+   ObjectSetInteger(0,HUD_START,OBJPROP_COLOR,C'255,255,255');
+   ObjectSetInteger(0,HUD_START,OBJPROP_FONTSIZE,9);
    ObjectSetString(0,HUD_START,OBJPROP_FONT,"Arial");
    ObjectSetString(0,HUD_START,OBJPROP_TEXT,(g_Enabled?"STOP":"START"));
    ObjectSetInteger(0,HUD_START,OBJPROP_BACK,false);
@@ -351,46 +336,41 @@ void HUD_Build()
 
    // Gate button
    if(ObjectFind(0,HUD_PGATE)<0) ObjectCreate(0,HUD_PGATE,OBJ_BUTTON,0,0,0);
-   ObjectSetInteger(0,HUD_PGATE,OBJPROP_CORNER,CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0,HUD_PGATE,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);
-   ObjectSetInteger(0,HUD_PGATE,OBJPROP_XDISTANCE,panelX + panelW - padding - btnW - btnW - btnGap);
-   ObjectSetInteger(0,HUD_PGATE,OBJPROP_YDISTANCE,btnY);
-   ObjectSetInteger(0,HUD_PGATE,OBJPROP_XSIZE,btnW);
-   ObjectSetInteger(0,HUD_PGATE,OBJPROP_YSIZE,btnH);
-   ObjectSetInteger(0,HUD_PGATE,OBJPROP_BGCOLOR,(g_UsePredictionsForEntries?GFX_TOGGLE_ON_BG:GFX_TOGGLE_OFF_BG));
-   ObjectSetInteger(0,HUD_PGATE,OBJPROP_COLOR,GFX_WHITE);
-   ObjectSetInteger(0,HUD_PGATE,OBJPROP_FONTSIZE,(int)MathRound(9*s));
+   ObjectSetInteger(0,HUD_PGATE,OBJPROP_CORNER,CORNER_LEFT_UPPER);
+   ObjectSetInteger(0,HUD_PGATE,OBJPROP_XDISTANCE,90);
+   ObjectSetInteger(0,HUD_PGATE,OBJPROP_YDISTANCE,45);
+   ObjectSetInteger(0,HUD_PGATE,OBJPROP_XSIZE,60);
+   ObjectSetInteger(0,HUD_PGATE,OBJPROP_YSIZE,25);
+   ObjectSetInteger(0,HUD_PGATE,OBJPROP_BGCOLOR,(g_UsePredictionsForEntries?buttonOn:buttonOff));
+   ObjectSetInteger(0,HUD_PGATE,OBJPROP_COLOR,C'255,255,255');
+   ObjectSetInteger(0,HUD_PGATE,OBJPROP_FONTSIZE,9);
    ObjectSetString(0,HUD_PGATE,OBJPROP_FONT,"Arial");
    ObjectSetString(0,HUD_PGATE,OBJPROP_TEXT,(g_UsePredictionsForEntries?"Gate:ON":"Gate:OFF"));
    ObjectSetInteger(0,HUD_PGATE,OBJPROP_BACK,false);
    ObjectSetInteger(0,HUD_PGATE,OBJPROP_SELECTABLE,false);
    ObjectSetInteger(0,HUD_PGATE,OBJPROP_ZORDER,2);
 
-   // Info labels
-   int infoY1 = panelY + padding + (int)MathRound(45*s);
-   int infoY2 = panelY + padding + (int)MathRound(60*s);
-   
+   // Risk info
    string rs=StringFormat("Risk %.2f%%  Spr:%d", g_RiskPerTradePct_Runtime, g_MaxSpreadPoints_Runtime);
    if(ObjectFind(0,HUD_RISK)<0) ObjectCreate(0,HUD_RISK,OBJ_LABEL,0,0,0);
-   ObjectSetInteger(0,HUD_RISK,OBJPROP_CORNER,CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0,HUD_RISK,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);
-   ObjectSetInteger(0,HUD_RISK,OBJPROP_XDISTANCE,panelX + panelW - padding);
-   ObjectSetInteger(0,HUD_RISK,OBJPROP_YDISTANCE,infoY1);
-   ObjectSetInteger(0,HUD_RISK,OBJPROP_FONTSIZE,(int)MathRound(9*s));
-   ObjectSetInteger(0,HUD_RISK,OBJPROP_COLOR,txt);
+   ObjectSetInteger(0,HUD_RISK,OBJPROP_CORNER,CORNER_LEFT_UPPER);
+   ObjectSetInteger(0,HUD_RISK,OBJPROP_XDISTANCE,20);
+   ObjectSetInteger(0,HUD_RISK,OBJPROP_YDISTANCE,75);
+   ObjectSetInteger(0,HUD_RISK,OBJPROP_FONTSIZE,9);
+   ObjectSetInteger(0,HUD_RISK,OBJPROP_COLOR,textColor);
    ObjectSetString(0,HUD_RISK,OBJPROP_FONT,"Arial");
    ObjectSetString(0,HUD_RISK,OBJPROP_TEXT,rs);
    ObjectSetInteger(0,HUD_RISK,OBJPROP_BACK,false);
    ObjectSetInteger(0,HUD_RISK,OBJPROP_SELECTABLE,false);
    ObjectSetInteger(0,HUD_RISK,OBJPROP_ZORDER,1);
 
+   // F7 hint
    if(ObjectFind(0,HUD_NOTE)<0) ObjectCreate(0,HUD_NOTE,OBJ_LABEL,0,0,0);
-   ObjectSetInteger(0,HUD_NOTE,OBJPROP_CORNER,CORNER_RIGHT_UPPER);
-   ObjectSetInteger(0,HUD_NOTE,OBJPROP_ANCHOR,ANCHOR_RIGHT_UPPER);
-   ObjectSetInteger(0,HUD_NOTE,OBJPROP_XDISTANCE,panelX + panelW - padding);
-   ObjectSetInteger(0,HUD_NOTE,OBJPROP_YDISTANCE,infoY2);
-   ObjectSetInteger(0,HUD_NOTE,OBJPROP_FONTSIZE,(int)MathRound(8*s));
-   ObjectSetInteger(0,HUD_NOTE,OBJPROP_COLOR,txt);
+   ObjectSetInteger(0,HUD_NOTE,OBJPROP_CORNER,CORNER_LEFT_UPPER);
+   ObjectSetInteger(0,HUD_NOTE,OBJPROP_XDISTANCE,20);
+   ObjectSetInteger(0,HUD_NOTE,OBJPROP_YDISTANCE,90);
+   ObjectSetInteger(0,HUD_NOTE,OBJPROP_FONTSIZE,8);
+   ObjectSetInteger(0,HUD_NOTE,OBJPROP_COLOR,textColor);
    ObjectSetString(0,HUD_NOTE,OBJPROP_FONT,"Arial");
    ObjectSetString(0,HUD_NOTE,OBJPROP_TEXT,"F7: Properties");
    ObjectSetInteger(0,HUD_NOTE,OBJPROP_BACK,false);
@@ -399,11 +379,14 @@ void HUD_Build()
 }
 void HUD_Refresh()
 {
+   color buttonOn = C'0,150,0';
+   color buttonOff = C'150,0,0';
+   
    ObjectSetString (0, HUD_START, OBJPROP_TEXT, (g_Enabled?"STOP":"START"));
-   ObjectSetInteger(0, HUD_START, OBJPROP_BGCOLOR, (g_Enabled?GFX_TOGGLE_OFF_BG:GFX_TOGGLE_ON_BG));
+   ObjectSetInteger(0, HUD_START, OBJPROP_BGCOLOR, (g_Enabled?buttonOff:buttonOn));
 
    ObjectSetString (0, HUD_PGATE,  OBJPROP_TEXT, (g_UsePredictionsForEntries?"Gate:ON":"Gate:OFF"));
-   ObjectSetInteger(0, HUD_PGATE,  OBJPROP_BGCOLOR,(g_UsePredictionsForEntries?GFX_TOGGLE_ON_BG:GFX_TOGGLE_OFF_BG));
+   ObjectSetInteger(0, HUD_PGATE,  OBJPROP_BGCOLOR,(g_UsePredictionsForEntries?buttonOn:buttonOff));
 
    string rs=StringFormat("Risk %.2f%%  Spr:%d", g_RiskPerTradePct_Runtime, g_MaxSpreadPoints_Runtime);
    ObjectSetString(0, HUD_RISK, OBJPROP_TEXT, rs);
@@ -411,45 +394,32 @@ void HUD_Refresh()
 
 void PRED_Build()
 {
-   bool dark; color pbg,pbrd,txt; GFX_GetTheme(pbg,pbrd,txt,dark);
-   double s=GFX_Scale();
+   // Simple prediction widget using CORNER_LEFT_UPPER for easier positioning
+   color bg = (color)ChartGetInteger(0,CHART_COLOR_BACKGROUND,0);
+   bool dark = (bg==0 || bg==clrBlack);
+   color panelBg = dark ? C'40,40,40' : C'240,240,240';
+   color textColor = dark ? C'255,255,255' : C'0,0,0';
    
-   // Prediction widget dimensions and positioning
-   int panelW = (int)MathRound(150*s);
-   int panelH = (int)MathRound(60*s);
-   int margin = (int)MathRound(10*s);
-   int padding = (int)MathRound(8*s);
-   
-   // For CORNER_RIGHT_LOWER: x=0 means right edge, y=0 means bottom edge
-   int panelX = margin;  // distance from right edge
-   int panelY = margin;  // distance from bottom edge
-
-   // Create prediction panel background
+   // Prediction panel background (positioned at bottom-left)
    if(ObjectFind(0,PBG)<0) ObjectCreate(0,PBG,OBJ_RECTANGLE_LABEL,0,0,0);
-   ObjectSetInteger(0,PBG,OBJPROP_CORNER,CORNER_RIGHT_LOWER);
-   ObjectSetInteger(0,PBG,OBJPROP_ANCHOR,ANCHOR_RIGHT_LOWER);
-   ObjectSetInteger(0,PBG,OBJPROP_XDISTANCE,panelX);
-   ObjectSetInteger(0,PBG,OBJPROP_YDISTANCE,panelY);
-   ObjectSetInteger(0,PBG,OBJPROP_XSIZE,panelW);
-   ObjectSetInteger(0,PBG,OBJPROP_YSIZE,panelH);
-   ObjectSetInteger(0,PBG,OBJPROP_BGCOLOR,pbg);
-   ObjectSetInteger(0,PBG,OBJPROP_COLOR,pbrd);
+   ObjectSetInteger(0,PBG,OBJPROP_CORNER,CORNER_LEFT_UPPER);
+   ObjectSetInteger(0,PBG,OBJPROP_XDISTANCE,10);
+   ObjectSetInteger(0,PBG,OBJPROP_YDISTANCE,120);
+   ObjectSetInteger(0,PBG,OBJPROP_XSIZE,150);
+   ObjectSetInteger(0,PBG,OBJPROP_YSIZE,60);
+   ObjectSetInteger(0,PBG,OBJPROP_BGCOLOR,panelBg);
+   ObjectSetInteger(0,PBG,OBJPROP_COLOR,C'100,100,100');
    ObjectSetInteger(0,PBG,OBJPROP_BACK,true);
    ObjectSetInteger(0,PBG,OBJPROP_SELECTABLE,false);
    ObjectSetInteger(0,PBG,OBJPROP_ZORDER,0);
 
-   // Prediction labels - positioned from bottom up
-   int lineHeight = (int)MathRound(15*s);
-   int startY = panelY + panelH - padding - lineHeight;
-   
    // p(up,1) label
    if(ObjectFind(0,PL1)<0) ObjectCreate(0,PL1,OBJ_LABEL,0,0,0);
-   ObjectSetInteger(0,PL1,OBJPROP_CORNER,CORNER_RIGHT_LOWER);
-   ObjectSetInteger(0,PL1,OBJPROP_ANCHOR,ANCHOR_RIGHT_LOWER);
-   ObjectSetInteger(0,PL1,OBJPROP_XDISTANCE,panelX + panelW - padding);
-   ObjectSetInteger(0,PL1,OBJPROP_YDISTANCE,startY);
-   ObjectSetInteger(0,PL1,OBJPROP_FONTSIZE,(int)MathRound(10*s));
-   ObjectSetInteger(0,PL1,OBJPROP_COLOR,txt);
+   ObjectSetInteger(0,PL1,OBJPROP_CORNER,CORNER_LEFT_UPPER);
+   ObjectSetInteger(0,PL1,OBJPROP_XDISTANCE,20);
+   ObjectSetInteger(0,PL1,OBJPROP_YDISTANCE,130);
+   ObjectSetInteger(0,PL1,OBJPROP_FONTSIZE,10);
+   ObjectSetInteger(0,PL1,OBJPROP_COLOR,textColor);
    ObjectSetString(0,PL1,OBJPROP_FONT,"Arial");
    ObjectSetString(0,PL1,OBJPROP_TEXT,"p(up,1): --");
    ObjectSetInteger(0,PL1,OBJPROP_BACK,false);
@@ -458,12 +428,11 @@ void PRED_Build()
 
    // exp +1 label
    if(ObjectFind(0,PL2)<0) ObjectCreate(0,PL2,OBJ_LABEL,0,0,0);
-   ObjectSetInteger(0,PL2,OBJPROP_CORNER,CORNER_RIGHT_LOWER);
-   ObjectSetInteger(0,PL2,OBJPROP_ANCHOR,ANCHOR_RIGHT_LOWER);
-   ObjectSetInteger(0,PL2,OBJPROP_XDISTANCE,panelX + panelW - padding);
-   ObjectSetInteger(0,PL2,OBJPROP_YDISTANCE,startY - lineHeight);
-   ObjectSetInteger(0,PL2,OBJPROP_FONTSIZE,(int)MathRound(10*s));
-   ObjectSetInteger(0,PL2,OBJPROP_COLOR,txt);
+   ObjectSetInteger(0,PL2,OBJPROP_CORNER,CORNER_LEFT_UPPER);
+   ObjectSetInteger(0,PL2,OBJPROP_XDISTANCE,20);
+   ObjectSetInteger(0,PL2,OBJPROP_YDISTANCE,145);
+   ObjectSetInteger(0,PL2,OBJPROP_FONTSIZE,10);
+   ObjectSetInteger(0,PL2,OBJPROP_COLOR,textColor);
    ObjectSetString(0,PL2,OBJPROP_FONT,"Arial");
    ObjectSetString(0,PL2,OBJPROP_TEXT,"exp +1: --");
    ObjectSetInteger(0,PL2,OBJPROP_BACK,false);
@@ -472,12 +441,11 @@ void PRED_Build()
 
    // exp +3 label
    if(ObjectFind(0,PL3)<0) ObjectCreate(0,PL3,OBJ_LABEL,0,0,0);
-   ObjectSetInteger(0,PL3,OBJPROP_CORNER,CORNER_RIGHT_LOWER);
-   ObjectSetInteger(0,PL3,OBJPROP_ANCHOR,ANCHOR_RIGHT_LOWER);
-   ObjectSetInteger(0,PL3,OBJPROP_XDISTANCE,panelX + panelW - padding);
-   ObjectSetInteger(0,PL3,OBJPROP_YDISTANCE,startY - 2*lineHeight);
-   ObjectSetInteger(0,PL3,OBJPROP_FONTSIZE,(int)MathRound(10*s));
-   ObjectSetInteger(0,PL3,OBJPROP_COLOR,txt);
+   ObjectSetInteger(0,PL3,OBJPROP_CORNER,CORNER_LEFT_UPPER);
+   ObjectSetInteger(0,PL3,OBJPROP_XDISTANCE,20);
+   ObjectSetInteger(0,PL3,OBJPROP_YDISTANCE,160);
+   ObjectSetInteger(0,PL3,OBJPROP_FONTSIZE,10);
+   ObjectSetInteger(0,PL3,OBJPROP_COLOR,textColor);
    ObjectSetString(0,PL3,OBJPROP_FONT,"Arial");
    ObjectSetString(0,PL3,OBJPROP_TEXT,"exp +3: --");
    ObjectSetInteger(0,PL3,OBJPROP_BACK,false);
