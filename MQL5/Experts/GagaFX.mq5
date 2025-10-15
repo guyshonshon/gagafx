@@ -337,11 +337,11 @@ void HUD_Build()
    ObjectSetInteger(0,HUD_START,OBJPROP_YDISTANCE,panelY + 50);
    ObjectSetInteger(0,HUD_START,OBJPROP_XSIZE,120);
    ObjectSetInteger(0,HUD_START,OBJPROP_YSIZE,35);
-   ObjectSetInteger(0,HUD_START,OBJPROP_BGCOLOR,(g_Enabled?buttonOff:buttonOn));
+   ObjectSetInteger(0,HUD_START,OBJPROP_BGCOLOR,(g_Enabled?buttonOn:buttonOff));
    ObjectSetInteger(0,HUD_START,OBJPROP_COLOR,C'255,255,255');
    ObjectSetInteger(0,HUD_START,OBJPROP_FONTSIZE,12);
    ObjectSetString(0,HUD_START,OBJPROP_FONT,"Arial");
-   ObjectSetString(0,HUD_START,OBJPROP_TEXT,(g_Enabled?"STOP":"START"));
+   ObjectSetString(0,HUD_START,OBJPROP_TEXT,(g_Enabled?"START":"STOP"));
    ObjectSetInteger(0,HUD_START,OBJPROP_BACK,false);
    ObjectSetInteger(0,HUD_START,OBJPROP_SELECTABLE,false);
    ObjectSetInteger(0,HUD_START,OBJPROP_ZORDER,2);
@@ -431,8 +431,9 @@ void HUD_Refresh()
    color buttonOn = C'0,150,0';
    color buttonOff = C'150,0,0';
    
-   ObjectSetString (0, HUD_START, OBJPROP_TEXT, (g_Enabled?"STOP":"START"));
-   ObjectSetInteger(0, HUD_START, OBJPROP_BGCOLOR, (g_Enabled?buttonOff:buttonOn));
+   // Fix button logic: when g_Enabled=true, show "START" (green), when false show "STOP" (red)
+   ObjectSetString (0, HUD_START, OBJPROP_TEXT, (g_Enabled?"START":"STOP"));
+   ObjectSetInteger(0, HUD_START, OBJPROP_BGCOLOR, (g_Enabled?buttonOn:buttonOff));
 
    ObjectSetString (0, HUD_PGATE,  OBJPROP_TEXT, (g_UsePredictionsForEntries?"Gate:ON":"Gate:OFF"));
    ObjectSetInteger(0, HUD_PGATE,  OBJPROP_BGCOLOR,(g_UsePredictionsForEntries?buttonOn:buttonOff));
@@ -980,6 +981,52 @@ double PredictUpProb()
    return p1; // return +1 prediction
 }
 
+// Console logging functions
+void LogTradeEntry(string side, double lots, double entry, double sl, double tp, double p1, double p2, double p3)
+{
+   Print("=== TRADE ENTRY ===");
+   Print("Side: ", side);
+   Print("Lots: ", DoubleToString(lots, 2));
+   Print("Entry: ", DoubleToString(entry, SymDigits));
+   Print("Stop Loss: ", DoubleToString(sl, SymDigits));
+   Print("Take Profit: ", DoubleToString(tp, SymDigits));
+   Print("Predictions: p1=", DoubleToString(p1, 3), " p2=", DoubleToString(p2, 3), " p3=", DoubleToString(p3, 3));
+   Print("Risk Points: ", DoubleToString(MathAbs(entry-sl)/_pt, 1));
+   Print("Reward Points: ", DoubleToString(MathAbs(tp-entry)/_pt, 1));
+   Print("Risk/Reward: ", DoubleToString(MathAbs(tp-entry)/MathAbs(entry-sl), 2));
+   Print("==================");
+}
+
+void LogTradeExit(string side, ulong ticket, double exit, double pnl, string reason)
+{
+   Print("=== TRADE EXIT ===");
+   Print("Side: ", side);
+   Print("Ticket: ", ticket);
+   Print("Exit: ", DoubleToString(exit, SymDigits));
+   Print("PnL: ", DoubleToString(pnl, 2));
+   Print("Reason: ", reason);
+   Print("=================");
+}
+
+void LogPredictionUpdate(double p1, double p2, double p3, double atr)
+{
+   if(g_LogPredictions)
+   {
+      Print("Prediction Update - p1:", DoubleToString(p1, 3), " p2:", DoubleToString(p2, 3), " p3:", DoubleToString(p3, 3), " ATR:", DoubleToString(atr, SymDigits));
+   }
+}
+
+void LogEntryConditions(bool longBias, bool shortBias, bool pattLong, bool pattShort, bool oscLong, bool oscShort, bool predLong, bool predShort, bool allowLong, bool allowShort)
+{
+   Print("=== ENTRY CONDITIONS ===");
+   Print("Long Bias: ", longBias, " Short Bias: ", shortBias);
+   Print("Pattern Long: ", pattLong, " Pattern Short: ", pattShort);
+   Print("Osc Long: ", oscLong, " Osc Short: ", oscShort);
+   Print("Pred Long: ", predLong, " Pred Short: ", predShort);
+   Print("Allow Long: ", allowLong, " Allow Short: ", allowShort);
+   Print("========================");
+}
+
 void OnlineScoreAndLearn()
 {
    int idx = (writePos-1+BUF)%BUF;
@@ -1268,6 +1315,9 @@ void TryEntries(double p1,double p2,double p3)
    bool allowLong  = longBias && pattLong  && oscLong  && bosOkLong  && (!g_UsePredictionsForEntries || predLong);
    bool allowShort = shortBias&& pattShort && oscShort && bosOkShort && (!g_UsePredictionsForEntries || predShort);
 
+   // Log entry conditions for debugging
+   LogEntryConditions(longBias, shortBias, pattLong, pattShort, oscLong, oscShort, predLong, predShort, allowLong, allowShort);
+
    // HTF S/R proximity
    bool nearRes=false, nearSup=false;
    double hh=0.0, ll=0.0;
@@ -1347,6 +1397,10 @@ void TryEntries(double p1,double p2,double p3)
             // get last deal id
             ulong ticket = (ulong)Trade.ResultDeal();
             AppendTradeCSV("BUY", ticket, ask, sl, tp, lots);
+            
+            // Log trade entry
+            LogTradeEntry("BUY", lots, ask, sl, tp, p1, p2, p3);
+            
             // annotate entry + expected
             datetime t0 = TimeCurrent();
             string nE = "GFX_ENT_"+IntegerToString((int)ticket);
@@ -1379,6 +1433,10 @@ void TryEntries(double p1,double p2,double p3)
          {
             ulong ticket = (ulong)Trade.ResultDeal();
             AppendTradeCSV("SELL", ticket, bid, sl, tp, lots);
+            
+            // Log trade entry
+            LogTradeEntry("SELL", lots, bid, sl, tp, p1, p2, p3);
+            
             datetime t0 = TimeCurrent();
             string nE = "GFX_ENT_"+IntegerToString((int)ticket);
             ObjectCreate(0,nE,OBJ_ARROW,0,t0,bid);
@@ -1619,8 +1677,8 @@ void GUI_Build()
    int col1 = x0;
    int col2 = x0 + lblW + pad;
 
-   // Background panel behind labels/buttons (lower z-order)
-   GFX_CreatePanel(GFX_BG, GFX_PanelX, GFX_PanelY, GFX_PanelW, 200, GFX_PanelBG, GFX_PanelBorder, 3);
+   // Background panel behind labels/buttons (lower z-order) - much taller to prevent cropping
+   GFX_CreatePanel(GFX_BG, GFX_PanelX, GFX_PanelY, GFX_PanelW, 600, GFX_PanelBG, GFX_PanelBorder, 3);
 
    GFX_Label(GFX_TITLE, "GagaFX Controls", x0, y, fsT, GFX_TextPrimary, 7);
    y += rowH + (int)MathRound(6*GFX_ScaleFactor);
@@ -2020,6 +2078,9 @@ void OnTick()
          AppendPredictionsCSV(TimeAt(1),p1,p2,p3,rsi,tsi,tsid,atr,(double)SpreadPoints());
          // Update bottom-right prediction widget each bar
          PRED_Update(p1, atr);
+         
+         // Log prediction updates
+         LogPredictionUpdate(p1, p2, p3, atr);
       }
 
       DrawPredictionArrows(p1,p2,p3);
