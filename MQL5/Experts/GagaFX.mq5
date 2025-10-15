@@ -61,7 +61,7 @@ input double  PartialClosePct       = 40.0;
 // ======== Prediction Gate ========
 input string  S6_Pred               = "===== Prediction Gate =====";
 input bool    UsePredictionsForEntries = true;
-input double  PredictThreshold      = 0.62;
+input double  PredictThreshold      = 0.52; // Lowered from 0.62 to allow more trades during learning
 input int     CalibrationBars       = 3000;
 input int     OnlineWindow          = 800;
 input bool    ResearchMode          = true;
@@ -1013,6 +1013,9 @@ void LogPredictionUpdate(double p1, double p2, double p3, double atr)
    if(g_LogPredictions)
    {
       Print("Prediction Update - p1:", DoubleToString(p1, 3), " p2:", DoubleToString(p2, 3), " p3:", DoubleToString(p3, 3), " ATR:", DoubleToString(atr, SymDigits));
+      Print("Bar Count:", barCount, " Threshold:", DoubleToString(g_PredictThreshold, 3));
+      Print("Pred Long:", (p1>=g_PredictThreshold || p2>=g_PredictThreshold || p3>=g_PredictThreshold));
+      Print("Pred Short:", (p1<=1.0-g_PredictThreshold || p2<=1.0-g_PredictThreshold || p3<=1.0-g_PredictThreshold));
    }
 }
 
@@ -1278,18 +1281,21 @@ void ManagePositions()
 //============================= Entries =================================//
 void TryEntries(double p1,double p2,double p3)
 {
-   if(!g_Enabled) return; // START/STOP master gate
+   Print("TryEntries called - g_Enabled:", g_Enabled, " p1:", DoubleToString(p1, 3), " p2:", DoubleToString(p2, 3), " p3:", DoubleToString(p3, 3));
+   
+   if(!g_Enabled) { Print("TryEntries: Trading disabled"); return; } // START/STOP master gate
    
    // Spread + microstructure + rollover
-   if(SpreadPoints()>g_MaxSpreadPoints_Runtime) return;
+   int spread = SpreadPoints();
+   if(spread>g_MaxSpreadPoints_Runtime) { Print("TryEntries: Spread too high:", spread, " > ", g_MaxSpreadPoints_Runtime); return; }
 
    MqlDateTime mt; TimeToStruct(TimeCurrent(), mt);
-   if(mt.min<5 || mt.min>=55) return; // first/last 5 minutes of hour
-   if((mt.hour==23 && mt.min>=45) || (mt.hour==0 && mt.min<=15)) return; // midnight roll
+   if(mt.min<5 || mt.min>=55) { Print("TryEntries: Microstructure filter - minute:", mt.min); return; } // first/last 5 minutes of hour
+   if((mt.hour==23 && mt.min>=45) || (mt.hour==0 && mt.min<=15)) { Print("TryEntries: Midnight rollover filter"); return; } // midnight roll
 
    // Session & news
-   if(UseSessionFilter && !(mt.hour>=SessionStartHour && mt.hour<SessionEndHour)) return;
-   if(BlockHighImpactNews && InNewsWindow(TimeCurrent())) return;
+   if(UseSessionFilter && !(mt.hour>=SessionStartHour && mt.hour<SessionEndHour)) { Print("TryEntries: Session filter - hour:", mt.hour); return; }
+   if(BlockHighImpactNews && InNewsWindow(TimeCurrent())) { Print("TryEntries: News block active"); return; }
    
    if(!EnsureRates(3)) return;
 
@@ -1334,10 +1340,15 @@ void TryEntries(double p1,double p2,double p3)
       if(HasOppositePosition(+1)) allowLong=false;
       if(HasOppositePosition(-1)) allowShort=false;
    }
-   if(CountOpenByMagic(0)>=MaxOpenPositions) { allowLong=false; allowShort=false; }
+   if(CountOpenByMagic(0)>=MaxOpenPositions) { 
+      Print("TryEntries: Max positions reached:", CountOpenByMagic(0), " >= ", MaxOpenPositions);
+      allowLong=false; allowShort=false; 
+   }
 
-   if(nearRes && !bosUp)   allowLong  = false;
-   if(nearSup && !bosDown) allowShort = false;
+   if(nearRes && !bosUp)   { Print("TryEntries: Near resistance, no BOS up"); allowLong  = false; }
+   if(nearSup && !bosDown) { Print("TryEntries: Near support, no BOS down"); allowShort = false; }
+   
+   Print("TryEntries: Final allowLong:", allowLong, " allowShort:", allowShort);
 
    double ask=SymbolInfoDouble(sym,SYMBOL_ASK);
    double bid=SymbolInfoDouble(sym,SYMBOL_BID);
@@ -1897,7 +1908,16 @@ int OnInit()
    ArraySetAsSeries(gRates,true);
    // Note: featBuf/closeBuf/timeBuf are statically-sized; keep natural indexing (no ArraySetAsSeries)
 
-   for(int i=0;i<FEAT_COUNT;i++){ w1[i]=0; w2[i]=0; w3[i]=0; }
+   // Initialize weights with small random values to get started
+   for(int i=0;i<FEAT_COUNT;i++){ 
+      w1[i]=MathRand()/32767.0*0.1 - 0.05; // random between -0.05 and 0.05
+      w2[i]=MathRand()/32767.0*0.1 - 0.05;
+      w3[i]=MathRand()/32767.0*0.1 - 0.05;
+   }
+   Print("GagaFX: Initialized prediction weights with random values");
+   Print("GagaFX: Prediction threshold set to:", DoubleToString(g_PredictThreshold, 3));
+   Print("GagaFX: Trading enabled:", g_Enabled, " UsePredictionsForEntries:", g_UsePredictionsForEntries);
+   Print("GagaFX: Max spread:", g_MaxSpreadPoints_Runtime, " Risk %:", g_RiskPerTradePct_Runtime);
 
    // daily baseline
    dayStartEquity=AccountInfoDouble(ACCOUNT_EQUITY);
