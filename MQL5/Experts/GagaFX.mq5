@@ -67,6 +67,15 @@ input int     OnlineWindow          = 800;
 input bool    ResearchMode          = true;
 input ENUM_SENTIMENT_SOURCE SentimentSource = SENTIMENT_INTERNAL;
 
+// ======== Testing & Risk Tolerance ========
+input string  S7_Testing            = "===== Testing & Risk Tolerance =====";
+input bool    TestingMode           = true; // Enable more aggressive trading for testing
+input double  TestingThreshold      = 0.51; // Even lower threshold for testing
+input bool    IgnoreOscillator      = false; // Skip oscillator requirements in testing
+input bool    IgnorePattern         = false; // Skip pattern requirements in testing
+input bool    IgnoreSessionFilter   = false; // Skip session filter in testing
+input bool    IgnoreNewsFilter      = false; // Skip news filter in testing
+
 // Additional required variables (kept for compatibility)
 input double  MaxDailyLossPct       = 5.0;
 input int     FastSMA               = 20;
@@ -278,6 +287,14 @@ bool   g_Enabled          = true;  // alias for g_TradingEnabled for HUD compati
 // HUD runtime mirrors
 double g_RiskPerTradePct_Runtime=0.0;
 int    g_MaxSpreadPoints_Runtime=0;
+
+// Testing mode runtime mirrors
+bool   g_TestingMode = false;
+double g_TestingThreshold = 0.51;
+bool   g_IgnoreOscillator = false;
+bool   g_IgnorePattern = false;
+bool   g_IgnoreSessionFilter = false;
+bool   g_IgnoreNewsFilter = false;
 
 // Note: Old HUD helper functions removed - now using direct object creation
 // for precise positioning control in HUD_Build() and PRED_Build()
@@ -1034,7 +1051,7 @@ void LogEntryConditions(bool longBias, bool shortBias, bool pattLong, bool pattS
 void LogBotPulse(double p1, double p2, double p3, double atr, double currentPrice, double emaF, double emaS, double rsi, bool longBias, bool shortBias, bool pattLong, bool pattShort, bool oscLong, bool oscShort, bool predLong, bool predShort, bool allowLong, bool allowShort, string nextPlanSide, double nextPlanLots, double nextPlanEntry, double nextPlanEstPx)
 {
    Print("┌─────────────────────────────────────────────────────────────┐");
-   Print("│                    GAGAFX BOT PULSE                        │");
+   Print("│                    GAGAFX BOT PULSE", (g_TestingMode?" (TESTING MODE)":"                        "), "│");
    Print("├─────────────────────────────────────────────────────────────┤");
    
    // Current market state
@@ -1047,7 +1064,8 @@ void LogBotPulse(double p1, double p2, double p3, double atr, double currentPric
    // Predictions
    Print("│ PREDICTIONS:");
    Print("│   p1: ", DoubleToString(p1, 3), " p2: ", DoubleToString(p2, 3), " p3: ", DoubleToString(p3, 3));
-   Print("│   Threshold: ", DoubleToString(g_PredictThreshold, 3));
+   double effectiveThreshold = g_TestingMode ? g_TestingThreshold : g_PredictThreshold;
+   Print("│   Threshold: ", DoubleToString(effectiveThreshold, 3), (g_TestingMode?" (TESTING)":""));
    Print("│   Pred Long: ", (predLong?"✓":"✗"), " Pred Short: ", (predShort?"✓":"✗"));
    
    // Analysis
@@ -1346,9 +1364,9 @@ void TryEntries(double p1,double p2,double p3)
    if(mt.min<5 || mt.min>=55) return; // first/last 5 minutes of hour
    if((mt.hour==23 && mt.min>=45) || (mt.hour==0 && mt.min<=15)) return; // midnight roll
 
-   // Session & news
-   if(UseSessionFilter && !(mt.hour>=SessionStartHour && mt.hour<SessionEndHour)) return;
-   if(BlockHighImpactNews && InNewsWindow(TimeCurrent())) return;
+   // Session & news (with testing overrides)
+   if(!g_IgnoreSessionFilter && UseSessionFilter && !(mt.hour>=SessionStartHour && mt.hour<SessionEndHour)) return;
+   if(!g_IgnoreNewsFilter && BlockHighImpactNews && InNewsWindow(TimeCurrent())) return;
    
    if(!EnsureRates(3)) return;
 
@@ -1362,17 +1380,19 @@ void TryEntries(double p1,double p2,double p3)
    bool pattLong  = IsBullishReversal(1);
    bool pattShort = IsBearishReversal(1);
 
-   bool oscLong   = (rsi>=RSI_LongMin && tsid>=TSI_MinDiff);
-   bool oscShort  = (rsi<=RSI_ShortMax && tsid<=-TSI_MinDiff);
+   bool oscLong   = (g_IgnoreOscillator || (rsi>=RSI_LongMin && tsid>=TSI_MinDiff));
+   bool oscShort  = (g_IgnoreOscillator || (rsi<=RSI_ShortMax && tsid<=-TSI_MinDiff));
 
    bool bosOkLong  = (!RequireBOS || bosUp);
    bool bosOkShort = (!RequireBOS || bosDown);
 
-   bool predLong  = (p1>=g_PredictThreshold || p2>=g_PredictThreshold || p3>=g_PredictThreshold);
-   bool predShort = (p1<=1.0-g_PredictThreshold || p2<=1.0-g_PredictThreshold || p3<=1.0-g_PredictThreshold);
+   // Use testing threshold if in testing mode
+   double effectiveThreshold = g_TestingMode ? g_TestingThreshold : g_PredictThreshold;
+   bool predLong  = (p1>=effectiveThreshold || p2>=effectiveThreshold || p3>=effectiveThreshold);
+   bool predShort = (p1<=1.0-effectiveThreshold || p2<=1.0-effectiveThreshold || p3<=1.0-effectiveThreshold);
 
-   bool allowLong  = longBias && pattLong  && oscLong  && bosOkLong  && (!g_UsePredictionsForEntries || predLong);
-   bool allowShort = shortBias&& pattShort && oscShort && bosOkShort && (!g_UsePredictionsForEntries || predShort);
+   bool allowLong  = longBias && (g_IgnorePattern || pattLong)  && oscLong  && bosOkLong  && (!g_UsePredictionsForEntries || predLong);
+   bool allowShort = shortBias&& (g_IgnorePattern || pattShort) && oscShort && bosOkShort && (!g_UsePredictionsForEntries || predShort);
 
    // Entry conditions are now logged in the comprehensive pulse above
 
@@ -1456,6 +1476,13 @@ void TryEntries(double p1,double p2,double p3)
             ulong ticket = (ulong)Trade.ResultDeal();
             AppendTradeCSV("BUY", ticket, ask, sl, tp, lots);
             
+            // Action logging
+            Print("🚀 GAGAFX ACTION: BUY ORDER EXECUTED");
+            Print("   Ticket: ", ticket, " Lots: ", DoubleToString(lots, 2), " Entry: ", DoubleToString(ask, SymDigits));
+            Print("   SL: ", DoubleToString(sl, SymDigits), " TP: ", DoubleToString(tp, SymDigits));
+            Print("   Predictions: p1=", DoubleToString(p1, 3), " p2=", DoubleToString(p2, 3), " p3=", DoubleToString(p3, 3));
+            Print("   Risk: ", DoubleToString(MathAbs(ask-sl)/_pt, 1), " pts | Reward: ", DoubleToString(MathAbs(tp-ask)/_pt, 1), " pts");
+            
             // Log trade entry
             LogTradeEntry("BUY", lots, ask, sl, tp, p1, p2, p3);
             
@@ -1491,6 +1518,13 @@ void TryEntries(double p1,double p2,double p3)
          {
             ulong ticket = (ulong)Trade.ResultDeal();
             AppendTradeCSV("SELL", ticket, bid, sl, tp, lots);
+            
+            // Action logging
+            Print("🚀 GAGAFX ACTION: SELL ORDER EXECUTED");
+            Print("   Ticket: ", ticket, " Lots: ", DoubleToString(lots, 2), " Entry: ", DoubleToString(bid, SymDigits));
+            Print("   SL: ", DoubleToString(sl, SymDigits), " TP: ", DoubleToString(tp, SymDigits));
+            Print("   Predictions: p1=", DoubleToString(p1, 3), " p2=", DoubleToString(p2, 3), " p3=", DoubleToString(p3, 3));
+            Print("   Risk: ", DoubleToString(MathAbs(sl-bid)/_pt, 1), " pts | Reward: ", DoubleToString(MathAbs(bid-tp)/_pt, 1), " pts");
             
             // Log trade entry
             LogTradeEntry("SELL", lots, bid, sl, tp, p1, p2, p3);
@@ -1926,6 +1960,14 @@ int OnInit()
    // HUD mirrors
    g_RiskPerTradePct_Runtime = RiskPerTradePct;
    g_MaxSpreadPoints_Runtime = MaxSpreadPoints;
+   
+   // Testing mode mirrors
+   g_TestingMode = TestingMode;
+   g_TestingThreshold = TestingThreshold;
+   g_IgnoreOscillator = IgnoreOscillator;
+   g_IgnorePattern = IgnorePattern;
+   g_IgnoreSessionFilter = IgnoreSessionFilter;
+   g_IgnoreNewsFilter = IgnoreNewsFilter;
 
    // indicators (chart TF)
    hEMAfast = iMA(sym,tf,FastEMA,0,MODE_EMA,(ENUM_APPLIED_PRICE)PRICE_CLOSE);
@@ -1971,6 +2013,12 @@ int OnInit()
    Print("GagaFX: Session Filter:", (UseSessionFilter?"ON":"OFF"), " (", SessionStartHour, ":00-", SessionEndHour, ":00)");
    Print("GagaFX: News Filter:", (BlockHighImpactNews?"ON":"OFF"));
    Print("GagaFX: Max Positions:", MaxOpenPositions, " Hedge Allowed:", AllowHedge);
+   Print("GagaFX: Testing Mode:", (g_TestingMode?"ON":"OFF"), " Threshold:", DoubleToString(g_TestingThreshold, 3));
+   if(g_TestingMode)
+   {
+      Print("GagaFX: Testing Overrides - Osc:", (g_IgnoreOscillator?"IGNORE":"REQUIRE"), " Pattern:", (g_IgnorePattern?"IGNORE":"REQUIRE"));
+      Print("GagaFX: Testing Overrides - Session:", (g_IgnoreSessionFilter?"IGNORE":"REQUIRE"), " News:", (g_IgnoreNewsFilter?"IGNORE":"REQUIRE"));
+   }
    Print("==========================================");
 
    // daily baseline
@@ -2007,6 +2055,12 @@ int OnInit()
 
 void OnDeinit(const int reason)
 {
+   Print("==========================================");
+   Print("GagaFX: BOT STOPPED - Reason: ", reason);
+   Print("GagaFX: Final Stats - Bars processed: ", barCount);
+   Print("GagaFX: Final Stats - Predictions: p1 hits=", hits1, "/", total1, " p2 hits=", hits2, "/", total2, " p3 hits=", hits3, "/", total3);
+   Print("==========================================");
+   
    if(ShowDashboard && ObjectFind(0,"GagaFX_DASH")>=0) ObjectDelete(0,"GagaFX_DASH");
    // clean minimal HUD and prediction widgets
    string pref[] = {HUD_BG,HUD_T,HUD_START,HUD_PGATE,HUD_RISK,HUD_NOTE,PBG,PL1,PL2,PL3};
